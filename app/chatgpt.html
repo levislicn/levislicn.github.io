@@ -33,6 +33,18 @@
 			<textarea id="question" style="width:calc(100% - 110px);margin:0px 10px;border:1px solid #353535;border-radius: 5px;"></textarea><button id="btnSubmit">提交</button>
 		</div>
 		<script>
+        var queryStrings=function() {
+		  var params=document.location.search,reg=/(?:^\?|&)(.*?)=(.*?)(?=&|$)/g,temp,args={};
+		  while((temp=reg.exec(params))!=null) args[temp[1]]=decodeURIComponent(temp[2]);
+		  return args;
+		};
+		var args=queryStrings();
+		var q = "hi"
+		var openaikey = args.key?args.key:"";
+		if(!openaikey){
+			document.body.innerHTML = "<div style='margin:30px 10px;font-size:1.5em;text-align:center'>KEY NOT PROVIDED</div>"
+			throw "error"
+		}
 		var q = "hi"
 		var openaikey = "OPENAI_API_KEY";
 		var chatUrl = "https://api.openai.com/v1/chat/completions";
