@@ -237,21 +237,6 @@
 		  				}
 		  	}
 		  	
-		  	function fnUploadBlob(fileBlob,targetDir,fileName,callback) {
-		  	    var fd = new FormData();  
-		  	    fd.set('targetDir', targetDir);   
-		  	    fd.set('fileName', fileName);  
-		  	    fd.set('fileUpload', fileBlob);
-		  	    var xhr = new XMLHttpRequest();  
-		  	    xhr.onreadystatechange = function () { 
-		  	        if (xhr.readyState == 4 && xhr.status == 200) {  
-		  	             res=xhr.responseText;      
-		  	             callback && callback(res);
-		  	        }
-		  	    };            
-		  	    xhr.open('POST', '../app/uploadBlob.php');  
-		  	    xhr.send(fd);  
-		  	}
 	  </script>
 	</head>
 	<body>
@@ -263,10 +248,12 @@
 			<textarea id="question"></textarea><button id="btnSubmit">提交</button><button style="display: none;" id="btnStop">停止</button>
 		</div>
 		<script>
-		const apikey = "";
-		var baseUrl =  "http://"+(location.hostname && location.hostname.indexOf("www.51chatbot.com")<0?location.hostname:"localhost")
+		var baseUrl =  "http://localhost";
+		if(location.hostname && location.hostname.indexOf("www")<0){
+			baseUrl = "http://"+location.hostname
+		}
 		var chatUrl = baseUrl + ":11434/api/chat";
-		var activeModel = "phi3"
+		var activeModel = ""
 		var isStreamMode = true,bolStop = true
 		var queryStrings=function() {
 		  var params=document.location.search,reg=/(?:^\?|&)(.*?)=(.*?)(?=&|$)/g,temp,args={};
@@ -303,9 +290,16 @@
 		            "Content-Type": "application/json"
 		        }
 		}).then((res)=>{
-		   return res.json()
+		   if(res.status==200){
+		   	  return res.json()
+		   }
+		   else{		  
+		   	 addMsg("错误提示","请确认ollama已经安装并且服务已开启。"+
+			                  "<a target='_blank' href='https://www.ollama.com/download'>前往Ollama安装</a>")
+		   	 return {}
+		   }	   
 		}).then((data)=>{
-			if(data.models){
+			if(data && data.models){
 				data.models.forEach((obj)=>{
 					const opt = document.createElement("option")
 					opt.value = obj.name
@@ -316,7 +310,11 @@
 					selModel.appendChild(opt)
 				})
 			}
-		})
+		}).catch((error)=>{
+		//console.error(error)
+		   addMsg("错误提示","请确认ollama已经安装并且服务已开启。"+
+		                    "<a target='_blank' href='https://www.ollama.com/download'>前往Ollama安装</a>")
+	    })
 		
 		selModel.onchange = function(){
 			activeModel = this.value?this.value:activeModel
@@ -342,38 +340,7 @@
 		}
 		
 		   
-		   const ts = (new Date()).getTime()
-		   const exp = ts + 30*60*1000
-			//和普通base64加密不一样
-			function base64UrlEncode(str) {
-			   var encodedSource = CryptoJS.enc.Base64.stringify(str);
-			   var reg = new RegExp('/', 'g');
-			   encodedSource = encodedSource.replace(/=+$/,'').replace(/\+/g,'-').replace(reg,'_');
-			   return encodedSource;
-			}
-			
-			let header = JSON.stringify({
-			  "alg": "HS256",
-			  //"typ": "JWT"
-			  "sign_type": "SIGN"
-			})
-			
-			let payload =JSON.stringify({
-			  "api_key": apikey.split(".").shift(),
-			  "exp": exp,
-			  "timestamp": ts
-			});
-			//let secretSalt = "user";
-			let secretSalt = apikey.split(".").pop()
-			let before_sign = base64UrlEncode(CryptoJS.enc.Utf8.parse(header)) + '.' + base64UrlEncode(CryptoJS.enc.Utf8.parse(payload));
-			
-			let  signature =CryptoJS.HmacSHA256(before_sign, secretSalt);
-			 signature = base64UrlEncode(signature);
-			 
-			let final_sign = before_sign + '.' + signature;
-			//final_sign:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoic2NhciIsInJvbGUiOiJhZG1pbiIsImV4cGlyYXRpb25EYXRhIjoiMjAxOC0xMC0yNCAxNzowNTowMCJ9.bVc48JsxiM7ZZgtZch1QnRpLyt08M9LepwoLvs_aejI
-			//console.log(final_sign)
-            let token = args.token?args.token:"sk-e1535b753b354a8e92475f496e71fad3"//final_sign
+	
 		
 
 		async function turbochat(q,role){
@@ -397,76 +364,6 @@
 				aMessage = []
 				aMessage.push({"role":"user","content":q})	
 				
-				/*
-				function fetchEventSource(url, options) {
-				        curRequestController = new AbortController();
-				        options.signal?.addEventListener("abort", () => {
-				          dispose();
-				        });
-				        fetch(url, { ...options, signal: curRequestController.signal })
-				          .then((response) => {
-				            if (response.status === 200) {
-				              options.onopen && options.onopen();
-				              return response.body;
-				            }
-				          })
-				          .then((readableStream) => {
-				            const reader = readableStream.getReader();
-				            const push = () => {
-				              return reader.read().then(({ done, value }) => {								
-				                if (done) {
-				                  options.onclose && options.onclose();
-				                  return;
-				                }
-				                options.onmessage &&
-				                  options.onmessage(new TextDecoder().decode(value));
-				
-				                return push();
-				              });
-				            };
-				            return push();
-				          })
-				          .catch((error) => {
-				            console.log(error);
-				            dispose();
-				            options.onerror && options.onerror(error);
-				          });
-				        function dispose() {
-				          curRequestController.abort();
-				        }
-				      }
-					  var intNum = 0
-					  const controller = new AbortController();
-					  fetchEventSource(chatUrl, {
-						method: "POST",
-						mode: "cors",
-						headers: {
-							"Authorization":token,
-						    "Content-Type": "application/json",
-						    "Accept": "text/event-stream",
-						},
-						body: JSON.stringify({
-						    "model":"glm-4",
-							"messages":aMessage,
-							"stream":true
-						}),
-						signal: controller.signal,
-						onopen() {
-						  console.log("连接已建立<br>");
-						},
-						onmessage(data) {
-						  //const { data } = JSON.parse(event);
-						  console.log(`${intNum++}收到数据：${data}<br>`);
-						},
-						onerror(error) {
-						  console.log(`连接已断开：${error}<br>`);
-						},
-						onclose() {
-						  console.log("连接已关闭<br>");
-						}
-					  });
-				throw "error"
-				*/
 				const response = await fetch(chatUrl, {
 				        method: "POST",
 				        cache: "no-cache",
@@ -585,6 +482,10 @@
 			    
 		}
 		btnSubmit.onclick = function(){
+			if(activeModel == ""){
+				showError("请选择模型",1500)
+				return
+			}
 			if(isWorking){
 			  showToast("请等待任务完成",1500)
 			  return
