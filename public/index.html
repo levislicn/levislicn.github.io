@@ -3,7 +3,7 @@
 	<head>
       <meta charset="utf-8">
       <meta name="viewport"  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"> 
-      <title>51ChatBot</title>
+      <title>Ollama-chat</title>
 	  <style>
 		  body{margin: 0px;padding: 0px;background-color: #F5F5F5;overflow: hidden;}
 		  div.question{font-weight:bold;padding: 10px;border-bottom: 1px solid #E6E6E6}
@@ -248,19 +248,22 @@
 			<textarea id="question"></textarea><button id="btnSubmit">提交</button><button style="display: none;" id="btnStop">停止</button>
 		</div>
 		<script>
-		var baseUrl =  "http://localhost";
-		if(location.hostname && location.hostname.indexOf("www")<0){
-			baseUrl = "http://"+location.hostname
-		}
-		var chatUrl = baseUrl + ":11434/api/chat";
-		var activeModel = ""
-		var isStreamMode = true,bolStop = true
 		var queryStrings=function() {
 		  var params=document.location.search,reg=/(?:^\?|&)(.*?)=(.*?)(?=&|$)/g,temp,args={};
 		  while((temp=reg.exec(params))!=null) args[temp[1]]=decodeURIComponent(temp[2]);
 		  return args;
 		};
 		var args=queryStrings();
+		var baseUrl =  "http://localhost";
+		if(location.hostname && location.hostname.indexOf("www")<0){
+			baseUrl = "http://"+location.hostname
+		}
+		if(args.ip && args.ip.split(".").length == 4){
+			baseUrl = "http://"+args.ip
+		}
+		var chatUrl = baseUrl + ":11434/api/chat";
+		var activeModel = ""
+		var isStreamMode = true,bolStop = true
 		isStreamMode = args.stream==0?false:isStreamMode
 		var isWeixin = /MicroMessenger/i.test(navigator.userAgent)
 		var isMobile = (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Windows Phone/i.test(navigator.userAgent)) ? true : false;
@@ -376,15 +379,17 @@
 							"messages":aMessage,
 							"stream":isStreamMode
 				        }),
-				});
+				}).catch((error)=>{
+					alert("POST error")
+				})
 				    
 				const reader = response.body.getReader();
 				var intRead = 0,lastData="";   
 				$("#"+divMsgId).html("")
-				while (true) {
+				while (true) {					
 					intRead += 1
 					//lastData = ""
-				    const {value, done} = await reader.read();
+				    const {value, done} = await reader.read();					
 					if (done || bolStop) {	
 						if(bolStop){
 						  reader.cancel()
@@ -427,8 +432,7 @@
 						divContent.scrollTo(0,divContent.scrollHeight - divContent.clientHeight)		
 						break;	
 					}	
-					let jsonData = new TextDecoder().decode(value)
-				
+					let jsonData = new TextDecoder().decode(value)				   
 					if(jsonData.indexOf('{"error"')==0){
 						let delta = "抱歉，无法访问"
 						$("#"+divMsgId).html(delta.replace(/\n/g,"<br>"))
@@ -454,18 +458,33 @@
 					else{
 						//console.log("readtimes",intRead,jsonData)
 						jsonData = lastData + jsonData.trim()
+						
 						jsonData.split(/data:/).forEach((dat)=>{
 							//console.log(dat)
+							//addMsg(intRead,dat)	
 							if(dat.trim().indexOf('{"model"')==0 && dat.trim().endsWith("}")){
-								let obj = JSON.parse(dat.trim())
-								//jd.choices.forEach((obj)=>{
-									let delta = obj.message.content
-									if(delta)
-									$("#"+divMsgId).append(delta.replace(/\n/g,"<br>"))
-									bolData = true
-									isWorking = true
-									divContent.scrollTo(0,divContent.scrollHeight - divContent.clientHeight)		  						
-								//})
+								  const lines = dat.trim().split('\n');
+								  let aObj = lines
+								    .filter(Boolean) 
+								    .map(line => JSON.parse(line));
+								
+								 aObj.forEach((obj)=>{
+									 let delta = obj.message.content
+									 if(delta)
+									 $("#"+divMsgId).append(delta.replace(/\n/g,"<br>"))
+									 bolData = true
+									 isWorking = true
+									 divContent.scrollTo(0,divContent.scrollHeight - divContent.clientHeight)
+								 })
+								/*
+								let obj = JSON.parse(dat.trim())							
+								let delta = obj.message.content
+								if(delta)
+								$("#"+divMsgId).append(delta.replace(/\n/g,"<br>"))
+								bolData = true
+								isWorking = true
+								divContent.scrollTo(0,divContent.scrollHeight - divContent.clientHeight)		  						
+								*/
 							}
 							else{
 							  lastData = dat.trim()
