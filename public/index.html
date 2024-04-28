@@ -259,7 +259,7 @@
 			baseUrl = "http://"+location.hostname
 		}
 		if(args.ip && args.ip.split(".").length == 4){
-			baseUrl = "http://"+args.ip
+			baseUrl = "//"+args.ip
 		}
 		var chatUrl = baseUrl + ":11434/api/chat";
 		var activeModel = ""
